@@ -17,6 +17,7 @@ const client = new ApolloClient({
   })
 });
 
+// Removing "requestDetails" from here will make the React warnings go away.
 const GET_MOVIES = gql(`
 query GetMovies($movieIds: [Int!]!) {
   movies(movieIds: $movieIds) {
@@ -97,6 +98,7 @@ function CollectionInfo(props: { collection: (typeof collections)[0] }) {
     variables: { movieIds: props.collection.movieIds },
     skip: false,
   })
+  // Removing this check will make the React warnings go away.
   if (loading) {
       return <p>loading</p>;
   }
