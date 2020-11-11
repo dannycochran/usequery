@@ -1,20 +1,21 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
-import { ApolloClient } from "apollo-client";
-import { HttpLink } from "apollo-link-http";
-import { InMemoryCache } from "apollo-cache-inmemory";
+import { BrowserRouter, Link, Route, Switch } from 'react-router-dom';
 
-import {
-  useQuery,
-  ApolloProvider as ApolloHooksProvider
-} from "@apollo/react-hooks";
+import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery} from "@apollo/client";
 
 const client = new ApolloClient({
   cache: new InMemoryCache(),
   link: new HttpLink({
     uri: "/graphql"
-  })
+  }),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: 'cache-and-network',
+      nextFetchPolicy: 'cache-first',
+    }
+  }
 });
 
 // Removing "requestDetails" from here will make the React warnings go away.
@@ -24,104 +25,52 @@ query GetMovies($movieIds: [Int!]!) {
     movieId
     internalTitle
   }
-  requestDetails {
-      id
-  }
 }
 `);
 
-const collections = Object.values({
-    "161e2aec-99cd-45ba-90f7-cbe1449ddc06": {
-      "movieIds": [
-        70000794,
-        80117456
-      ]
-    },
-    "e644ab32-4ae4-4bd2-8117-7a2bccf2fb0d": {
-      "movieIds": [
-        80117715
-      ]
-    },
-    "44b68af6-9436-4111-9a5f-c8a79b4dca58": {
-      "movieIds": [
-        80117456
-      ]
-    },
-    "e128a262-036d-4133-bb20-834b07800a56": {
-      "movieIds": [
-        80117456,
-        80025678
-      ]
-    },
-    "c91bae38-82d1-4e7e-85d7-bb12bf643f73": {
-      "movieIds": [
-        80077209
-      ]
-    },
-    "365906b8-5a8a-4769-b185-abd162e685b1": {
-      "movieIds": [
-        81023181
-      ]
-    },
-    "19096da2-2138-4724-a141-0d4bf803d1dd": {
-      "movieIds": [
-        81023035
-      ]
-    },
-    "73f6d28b-bfe7-44bf-91d4-452410137618": {
-      "movieIds": [
-        81023035
-      ]
-    },
-    "8e09c04e-a0e0-46c9-bcaa-c377a8146163": {
-      "movieIds": [
-        81023035
-      ]
-    },
-    "7985704a-3b4a-4739-a814-e0513246ccd3": {
-      "movieIds": [
-        81023035
-      ]
-    }
-  });
-
-function CollectionDetails(props: { movieIds: number[] }) {
-    const { data } = useQuery(GET_MOVIES, {
-        variables: { movieIds: props.movieIds },
-        skip: false,
-      });
-    return <p>{JSON.stringify(data)}</p>
-}
-
-function CollectionInfo(props: { collection: (typeof collections)[0] }) {
-  const { loading } = useQuery(GET_MOVIES, {
-    variables: { movieIds: props.collection.movieIds },
-    skip: false,
-  })
-  // Removing this check will make the React warnings go away.
-  if (loading) {
-      return <p>loading</p>;
-  }
+function FooBarPage() {
   return <div>
-      <CollectionDetails movieIds={props.collection.movieIds} />
-      </div>;
+    <h1>Foobar Route</h1>
+    <Link to={'/'}>Click me to go back to home and see the query re-fire</Link>
+  </div>
 }
 
-function Collections() {
+function HomePage() {
+  const { data, loading } = useQuery(GET_MOVIES, {
+    variables: { movieIds: [80117456, 80025678] }
+  });
   return (
-    <ul>
-      {collections.map((collection, index) => {
-          return <div key={index}>
-              <CollectionInfo collection={collection} />
-              </div>;
-      })}
-    </ul>
+    <div>
+      <h1>Home Page Route</h1>
+      <Link to={'/foobar'}>Click me to unmount to another route</Link>
+      {(() => {
+        if (loading) {
+          return <div>loading (we only want to see this on first mount)...</div>
+        }
+        <ul>
+          {data.movies.map((movie: any) => {
+            return <div key={movie.movieId}>
+              <div>{movie.internalTitle}</div>
+            </div>;
+          })}
+        </ul>
+      })()}
+    </div>
   );
 }
 
+function App() {
+  return <ApolloProvider client={client}>
+    <BrowserRouter>
+      <Switch>
+        <Route exact path={'/'} component={HomePage} />
+        <Route exact path={'/foobar'} component={FooBarPage} />
+      </Switch>
+    </BrowserRouter>
+  </ApolloProvider>
+}
+
 ReactDOM.render(
-  <ApolloHooksProvider client={client}>
-    <Collections />
-  </ApolloHooksProvider>,
+  <App />,
   document.getElementById("root")
 );

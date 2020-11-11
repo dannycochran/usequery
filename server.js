@@ -78,9 +78,6 @@ const server = new ApolloServer({
                     }, 2000);
                 });
             },
-            requestDetails: (root, args, context, info) => {
-                return { id: v4() };
-            }
         },
     }
 });
