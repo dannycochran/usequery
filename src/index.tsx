@@ -6,25 +6,16 @@ import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery} from "
 
 const client = new ApolloClient({
   cache: new InMemoryCache({
-    // typePolicies: {
-    //   // Query: {
-    //   //   movies: {
-          
-    //   //   },
-    //   // },
-    //   Movie: {
-    //     fields: {
-    //       artworks: {
-    //         merge: (
-    //           existing,
-    //           incoming,
-    //         ) => {
-    //           return existing ?? incoming;
-    //         },
-    //       }
-    //     }
-    //   }
-    // }
+    typePolicies: {
+      Movie: {
+        keyFields: (object, context) => {
+          console.log('got object', object);
+          const movie = object as any; 
+          const artworkIds = movie.artworks.map((artwork: any) => artwork.id).join(', ');
+          return `${object.__typename}:${object.id}:${artworkIds}`;
+        }
+      }
+    }
   }),
   link: new HttpLink({
     uri: "/graphql"
@@ -34,10 +25,10 @@ const client = new ApolloClient({
 // Removing "requestDetails" from here will make the React warnings go away.
 const GET_MOVIES = gql(`
 query GetMovies($filters: Filters) {
-  movies {
+  movies(filters: $filters) {
     id
     internalTitle
-    artworks(filters: $filters) {
+    artworks {
       id
       name
       language

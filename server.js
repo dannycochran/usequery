@@ -9,13 +9,9 @@ const simpleSchema = gql`
     }
 
     type Query {
-        movies: [Movie!]!
+        movies(filters: Filters): [Movie!]!
     }
-    type Movie {
-        id: ID!
-        internalTitle: String!
-        artworks(filters: Filters): [Artwork!]!
-    }
+
     type Artwork {
         id: ID!
         name: String!
@@ -26,7 +22,7 @@ const simpleSchema = gql`
     type Movie {
         id: ID!
         internalTitle: String!
-        artworks(filters: Filters): [Artwork!]!
+        artworks: [Artwork!]!
     }
 `;
 
@@ -103,33 +99,30 @@ const server = new ApolloServer({
     resolvers: {
         Query: {
             movies: (root, args, context, info) => {
-                console.log('hit movies query');
-                return Object.values(fakeMovies);
-            },
-        },
-        Movie: {
-            artworks: async (parent, args, context) => {
-                console.log('hit artworks query', parent, args);
                 const filters = args.filters;
                 const languagesSet = new Set(filters.languages);
                 const typesSet = new Set(filters.types);
                 return new Promise(resolve => {
-                    const artworksForMovie = fakeMovies[parent.id].artworks;
-                    const artworks = artworksForMovie.filter(artwork => {
-                        if (filters.languages.length && !languagesSet.has(artwork.language)) {
-                            return false;
+                    const movies = Object.values(fakeMovies).map(movie => {
+                        return {
+                            ...movie,
+                            artworks: movie.artworks.filter(artwork => {
+                                if (filters.languages.length && !languagesSet.has(artwork.language)) {
+                                    return false;
+                                }
+                                if (filters.types.length && !typesSet.has(artwork.type)) {
+                                    return false;
+                                }
+                                return true;
+                            }),
                         }
-                        if (filters.types.length && !typesSet.has(artwork.type)) {
-                            return false;
-                        }
-                        return true;
-                    });
+                    })
                     setTimeout(() => {
-                        resolve(artworks)
+                        resolve(movies)
                     }, 500);
                 });
             },
-        }
+        },
     }
 });
 const app = express();
