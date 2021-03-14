@@ -3,13 +3,8 @@ const express = require('express');
 const { v4 } = require('uuid');
 
 const simpleSchema = gql`
-    input Filters {
-        languages: [String!]!
-        types: [String!]!
-    }
-
     type Query {
-        movies(filters: Filters): [Movie!]!
+        movies(foo: String): [Movie!]!
     }
 
     type Artwork {
@@ -22,7 +17,7 @@ const simpleSchema = gql`
     type Movie {
         id: ID!
         internalTitle: String!
-        artworks: [Artwork!]!
+        artworks(languages: [String!]!): [Artwork!]!
     }
 `;
 
@@ -99,23 +94,15 @@ const server = new ApolloServer({
     resolvers: {
         Query: {
             movies: (root, args, context, info) => {
-                const filters = args.filters;
-                const languagesSet = new Set(filters.languages);
-                const typesSet = new Set(filters.types);
+                console.log('calling movies resolver');
+                const languages = args.languages;
+                const languagesSet = new Set(languages);
+                const typesSet = new Set();
                 return new Promise(resolve => {
                     const movies = Object.values(fakeMovies).map(movie => {
-                        return {
-                            ...movie,
-                            artworks: movie.artworks.filter(artwork => {
-                                if (filters.languages.length && !languagesSet.has(artwork.language)) {
-                                    return false;
-                                }
-                                if (filters.types.length && !typesSet.has(artwork.type)) {
-                                    return false;
-                                }
-                                return true;
-                            }),
-                        }
+                        const movieToReturn = { ...movie };
+                        delete movieToReturn.artworks;
+                        return movieToReturn;
                     })
                     setTimeout(() => {
                         resolve(movies)
@@ -123,6 +110,25 @@ const server = new ApolloServer({
                 });
             },
         },
+        Movie: {
+            artworks: (obj, args) => {
+                console.log('calling artworks resolver', obj, args);
+                const languages = args.languages;
+                const languagesSet = new Set(languages);
+                const movie = fakeMovies[obj.id];
+                return new Promise(resolve => {
+                    const artworks = movie.artworks.filter(artwork => {
+                        if (languages.length && !languagesSet.has(artwork.language)) {
+                            return false;
+                        }
+                        return true;
+                    });
+                    setTimeout(() => {
+                        resolve(artworks)
+                    }, 500);
+                });
+            },
+        }
     }
 });
 const app = express();
