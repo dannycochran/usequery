@@ -1,90 +1,110 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 
-import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery} from "@apollo/client";
+import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery, useMutation} from "@apollo/client";
+import { LocalStorageWrapper, persistCache } from "apollo3-cache-persist";
 
-const client = new ApolloClient({
-  cache: new InMemoryCache({
+
+const createClient = async () => {
+  const cache = new InMemoryCache({
     typePolicies: {
-      Query: {
-
-      },
-      // Movie: {
-      //   keyFields: (object, context) => {
-      //     const movie = object as any; 
-      //     const artworkIds = movie.artworks.map((artwork: any) => artwork.id).join(', ');
-      //     return `${object.__typename}:${object.id}:${artworkIds}`;
-      //   }
-      // }
+      Movie: {
+        fields: {
+          tags: {
+            merge: (existing, incoming, { mergeObjects }) => {
+              return incoming ?? existing;
+            }
+          }
+        }
+      }
     }
-  }),
-  link: new HttpLink({
-    uri: "/graphql"
-  }),
-});
+  });
+  await persistCache({
+    cache,
+    storage: new LocalStorageWrapper(window.localStorage),
+  })
+  return new ApolloClient({
+    defaultOptions: {
+      watchQuery: {
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy(lastFetchPolicy) {
+          if (lastFetchPolicy === 'cache-and-network' || lastFetchPolicy === 'network-only') {
+            return 'cache-first';
+          }
+          return lastFetchPolicy;
+        },
 
-// Removing "requestDetails" from here will make the React warnings go away.
+        // By default, mutation calls to `refetchQueries` do not trigger re-renders, e.g.
+        // the loading state would be silent. We don't want that. We want loading states.
+        notifyOnNetworkStatusChange: true,
+      },
+    },
+    cache,
+    link: new HttpLink({
+      uri: "/graphql"
+    }),
+  });
+};
+
 const GET_MOVIES = gql(`
-query GetMovies($languages: [String!]!) {
-  movies {
+query GetMovies($movieIds: [String!]!) {
+  movies(movieIds: $movieIds) {
     id
     internalTitle
-    artworks(languages: $languages) {
+    tags {
       id
       name
-      language
-      type
     }
   }
 }
 `);
 
-const languageOptions = ['en', 'de', 'es', 'ko', 'ja', 'it'];
-const imageTypeOptions = ['wide', 'tall', 'billboard', 'screen', 'mobile'];
+const ADD_TAGS = gql(`
+mutation AddTagToMovie($movieId: String!, $tagIds: [String!]!) {
+  addTagsToMovie(movieId: $movieId, tagIds: $tagIds) {
+    id
+  }
+}
+`);
+
+const REMOVE_TAGS = gql(`
+mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
+  removeTagsFromMovie(movieId: $movieId, tagIds: $tagIds) {
+    id
+  }
+}
+`);
 
 function HomePage() {
-  const [languages, setLanguages] = useState<string[]>([]);
-  const [types, setTypes] = useState<string[]>([]);
+  const [movieIds, setMovieIds] = useState<string[]>(['1']);
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
-      languages,
+      movieIds,
     },
-    notifyOnNetworkStatusChange: true,
+  });
+  const [addTagToMovie] = useMutation(ADD_TAGS, {
+    refetchQueries: ['GetMovies'],
+  });
+  const [removeTagFromMovie] = useMutation(REMOVE_TAGS, {
+    refetchQueries: ['GetMovies'],
   });
 
-  const languagesSet = new Set(languages);
-  const typesSet = new Set(types);
-
-  const onClickLanguage = useCallback((language: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = event.target.checked;
-    if (checked) {
-      setLanguages([
-        ...languages,
-        language,
-      ])
-    } else {
-      const index = languages.indexOf(language);
-      const newLanguages = [...languages];
-      newLanguages.splice(index, 1);
-      setLanguages(newLanguages);
+  const onClickAddTags = useCallback(async (movieId: string, tagIds: string[]) => {
+    try {
+      await addTagToMovie({ variables: { movieId, tagIds }});
+    } catch (err) {
+      console.warn(`failed to add tag to ${movieId}`);
     }
-  }, [languages]);
+  }, [removeTagFromMovie]);
 
-  const onClickType = useCallback((type: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = event.target.checked;
-    if (checked) {
-      setTypes([
-        ...types,
-        type,
-      ])
-    } else {
-      const index = types.indexOf(type);
-      const newTypes = [...types];
-      newTypes.splice(index, 1);
-      setTypes(newTypes);
+  const onClickRemoveTags = useCallback(async (movieId: string, tagIds: string[]) => {
+    try {
+      await removeTagFromMovie({ variables: { movieId, tagIds }});
+    } catch (err) {
+      console.warn(`failed to remove tag from ${movieId}`);
     }
-  }, [types]);
+  }, [removeTagFromMovie]);
 
   return (
     <div>
@@ -94,32 +114,32 @@ function HomePage() {
           return <div>loading</div>
         }
         return <div style={{ display: 'flex', flexDirection: 'column', flex: 1}}>
-          <ul style={{ display: 'flex', flexDirection: 'row', flex: 1}}>
-            {languageOptions.map(language => {
-              return <div key={language} style={{ marginRight: 10 }}>
-                <label>{language}</label>
-                <br />
-                <input type='checkbox' checked={languagesSet.has(language)} value={language} onChange={onClickLanguage(language)} />
-              </div>;
-            })}
-          </ul>
-          <ul style={{ display: 'flex', flexDirection: 'row', flex: 1}}>
-            {imageTypeOptions.map(type => {
-              return <div key={type} style={{ marginRight: 10 }}>
-                <label>{type}</label>
-                <br />
-                <input type='checkbox' checked={typesSet.has(type)} value={type} onChange={onClickType(type)} />
-              </div>;
-            })}
-          </ul>
           <ul>
             {data.movies.map((movie: any) => {
+              const hasTag1 = movie.tags.find((t: any) => t.id === 'tag-1');
+              const hasTag2 = movie.tags.find((t: any) => t.id === 'tag-2');
+              const hasTag3 = movie.tags.find((t: any) => t.id === 'tag-3');
+              const hasTag4 = movie.tags.find((t: any) => t.id === 'tag-4');
+              const sortedTags = [...movie.tags].sort((tagA: any, tagB: any) => {
+                return tagA.name.localeCompare(tagB.name);
+              });
               return <div key={movie.id} style={{ marginBottom: 10 }}>
                 <h4>{movie.internalTitle}</h4>
+                <div style={{ fontWeight: 'bold' }}>add more tags (remove a tag to add)</div>
+
+                <button disabled={hasTag3 || hasTag4} onClick={() => onClickAddTags(movie.id, ['tag-3', 'tag-4'])}>Add tag 3 and 4 at once</button>
+                <button disabled={hasTag1} onClick={() => onClickAddTags(movie.id, ['tag-1'])}>Add tag 1</button>
+                <button disabled={hasTag2} onClick={() => onClickAddTags(movie.id, ['tag-2'])}>Add tag 2</button>
+                <button disabled={hasTag3} onClick={() => onClickAddTags(movie.id, ['tag-3'])}>Add tag 3</button>
+                <button disabled={hasTag4} onClick={() => onClickAddTags(movie.id, ['tag-4'])}>Add tag 4</button>
+
+                <div style={{ marginBottom: 50, width: '100%' }} />
+                <div style={{ fontWeight: 'bold' }}>movie tags</div>
                 <div>
-                  {movie.artworks.map((artwork: any) => {
-                    return <div key={artwork.id}>
-                      <div>{artwork.name}</div>
+                  {sortedTags.map((tag: any) => {
+                    return <div key={tag.id}>
+                      <div>{tag.name}</div>
+                      <button onClick={() => onClickRemoveTags(movie.id, [tag.id])}>remove tag</button>
                     </div>
                   })}
                 </div>
@@ -132,13 +152,18 @@ function HomePage() {
   );
 }
 
-function App() {
+function App({ client }: { client: ApolloClient<any> }) {
   return <ApolloProvider client={client}>
     <HomePage />
   </ApolloProvider>
 }
 
-ReactDOM.render(
-  <App />,
-  document.getElementById("root")
-);
+const renderReactApp = async () => {
+  const client = await createClient();
+  ReactDOM.render(
+    <App client={client} />,
+    document.getElementById("root")
+  );  
+};
+
+renderReactApp();

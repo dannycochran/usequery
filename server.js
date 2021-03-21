@@ -4,130 +4,92 @@ const { v4 } = require('uuid');
 
 const simpleSchema = gql`
     type Query {
-        movies(foo: String): [Movie!]!
+        movies(movieIds: [String!]!): [Movie!]!
     }
 
-    type Artwork {
-        id: ID!
+    type Mutation {
+        addTagsToMovie(movieId: String, tagIds: [String!]): Movie!
+        removeTagsFromMovie(movieId: String, tagIds: [String!]): Movie!
+    }
+
+    type Tag {
+        id: String!
         name: String!
-        type: String!
-        language: String!
     }
 
     type Movie {
-        id: ID!
+        id: String!
         internalTitle: String!
-        artworks(languages: [String!]!): [Artwork!]!
+        tags: [Tag!]!
     }
 `;
 
-const fakeMovies = {
-    '80117715': {
-        id: '80117715',
-        internalTitle: 'some movie 80117715',
+const fakeTags = {
+    'tag-1': {
+        id: 'tag-1',
+        name: 'tag 1',
     },
-    '80057281': {
-        id: '80057281',
-        internalTitle: 'some movie 80057281',
+    'tag-2': {
+        id: 'tag-2',
+        name: 'tag 2',
     },
-    '80117456': {
-        id: '80117456',
-        internalTitle: 'some movie 80117456',
+    'tag-3': {
+        id: 'tag-3',
+        name: 'tag 3',
     },
-    '80229867': {
-        id: '80229867',
-        internalTitle: 'some movie 80229867',
-    },
-    '80025678': {
-        id: '80025678',
-        internalTitle: 'some movie 80025678',
-    },
-    '80229865':{
-        id: '80229865',
-        internalTitle: 'some movie 80229865',
-    },
-    '81023035':{
-        id: '81023035',
-        internalTitle: 'some movie 81023035',
-    },
-    '80077209': {
-        id: '80077209',
-        internalTitle: 'some movie 80077209',
-    },
-    '81023174': {
-        id: '81023174',
-        internalTitle: 'some movie 81023174',
-    },
-    '81023181':{
-        id: '81023181',
-        internalTitle: 'some movie 81023181',
-    },
-    '70000794':{
-        id: '70000794',
-        internalTitle: 'some movie 70000794',
+    'tag-4': {
+        id: 'tag-4',
+        name: 'tag 4',
     },
 };
 
-const languages = ['en', 'de', 'es', 'ko', 'ja', 'it'];
-const imageTypes = ['wide', 'tall', 'billboard', 'screen', 'mobile'];
-const movieIds = Object.keys(fakeMovies);
-for (let i = 0; i < 100; i++) {
-    const language = languages[Math.floor(Math.random() * languages.length)];
-    const imageType = imageTypes[Math.floor(Math.random() * imageTypes.length)];
-    const movieId = movieIds[Math.floor(Math.random() * movieIds.length)];
-
-    const artwork = {
-        id: `${Math.random()}-${language}-${imageType}`,
-        name: `artwork-${language}-${imageType}`,
-        language,
-        type: imageType,
-    };
-
-    if (!fakeMovies[movieId].artworks) {
-        fakeMovies[movieId].artworks = [];
-    }
-    fakeMovies[movieId].artworks.push(artwork);
-}
+const fakeMovies = {
+    '1': {
+        id: '1',
+        internalTitle: 'some movie 1',
+        tags: Object.values(fakeTags),
+    },
+};
 
 const server = new ApolloServer({
     typeDefs: simpleSchema.loc.source.body,
     resolvers: {
         Query: {
             movies: (root, args, context, info) => {
-                console.log('calling movies resolver');
-                const languages = args.languages;
-                const languagesSet = new Set(languages);
-                const typesSet = new Set();
                 return new Promise(resolve => {
-                    const movies = Object.values(fakeMovies).map(movie => {
-                        const movieToReturn = { ...movie };
-                        delete movieToReturn.artworks;
-                        return movieToReturn;
-                    })
                     setTimeout(() => {
-                        resolve(movies)
-                    }, 500);
+                        resolve(args.movieIds.map(movieId => fakeMovies[movieId]));
+                    }, 100);
                 });
             },
         },
-        Movie: {
-            artworks: (obj, args) => {
-                console.log('calling artworks resolver', obj, args);
-                const languages = args.languages;
-                const languagesSet = new Set(languages);
-                const movie = fakeMovies[obj.id];
+        Mutation: {
+            addTagsToMovie: (root, args, context, info) => {
+                const movie = fakeMovies[args.movieId];
+                args.tagIds.forEach(tagId => {
+                    movie.tags.push(fakeTags[tagId]);
+                });
+                movie.tags = Array.from(new Set(movie.tags));
                 return new Promise(resolve => {
-                    const artworks = movie.artworks.filter(artwork => {
-                        if (languages.length && !languagesSet.has(artwork.language)) {
-                            return false;
-                        }
-                        return true;
-                    });
                     setTimeout(() => {
-                        resolve(artworks)
-                    }, 500);
+                        resolve(fakeMovies[args.movieId]);
+                    }, 100);
                 });
             },
+            removeTagsFromMovie: (root, args, context, info) => {
+                const movie = fakeMovies[args.movieId];
+                args.tagIds.forEach(tagId => {
+                    const tagIndex = movie.tags.findIndex(tag => tag.id === tagId);
+                    if (tagIndex !== -1) {
+                        movie.tags.splice(tagIndex, 1);
+                    }
+                });
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(fakeMovies[args.movieId]);
+                    }, 100);
+                });
+            }
         }
     }
 });
