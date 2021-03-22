@@ -1,15 +1,18 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 
-import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery, useMutation} from "@apollo/client";
-import { LocalStorageWrapper, persistCache } from "apollo3-cache-persist";
+import { createClient as studioCreateClient, useQuery, useMutation, InMemoryCacheConfig, ApolloProvider, ApolloClient } from '@studio-ui-common/studio-graphql-client';
+import { persistenceLink } from "@studio-ui-common/studio-graphql-client/links/persistence";
 
 
-const createClient = async () => {
-  const cache = new InMemoryCache({
+const createClient = () => {
+  const cacheConfig: InMemoryCacheConfig = {
     typePolicies: {
-      Movie: {
+      DetailsWrapper: {
+        keyFields: ['details', ['id']],
+      },
+      Details: {
         fields: {
           tags: {
             merge: (existing, incoming, { mergeObjects }) => {
@@ -17,16 +20,18 @@ const createClient = async () => {
             }
           }
         }
-      }
+      },
     }
-  });
-  await persistCache({
-    cache,
-    storage: new LocalStorageWrapper(window.localStorage),
-  })
-  return new ApolloClient({
+  };
+
+  return studioCreateClient({
+    cacheConfig,
+    uri: '/graphql',
     defaultOptions: {
       watchQuery: {
+        persistFetchPolicyState: true,
+        // Read from persisted cache at first when opening app, but kick off a network
+        // request to get updated data.
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy(lastFetchPolicy) {
           if (lastFetchPolicy === 'cache-and-network' || lastFetchPolicy === 'network-only') {
@@ -34,16 +39,16 @@ const createClient = async () => {
           }
           return lastFetchPolicy;
         },
-
+  
         // By default, mutation calls to `refetchQueries` do not trigger re-renders, e.g.
         // the loading state would be silent. We don't want that. We want loading states.
         notifyOnNetworkStatusChange: true,
       },
     },
-    cache,
-    link: new HttpLink({
-      uri: "/graphql"
-    }),
+    namedLinks: {
+      corsLink: false,
+      persistenceLink,
+    }
   });
 };
 
@@ -52,10 +57,25 @@ query GetMovies($movieIds: [String!]!) {
   movies(movieIds: $movieIds) {
     id
     internalTitle
-    tags {
-      id
-      name
+    detailWrappers {
+      description
+      details {
+        id
+        tags {
+          id
+          name
+        }
+      }
     }
+  }
+}
+`);
+
+const GET_TAGS = gql(`
+query GetTags($movieId: String) {
+  tags(movieId: $movieId) {
+    id
+    name
   }
 }
 `);
@@ -77,11 +97,13 @@ mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
 `);
 
 function HomePage() {
-  const [movieIds, setMovieIds] = useState<string[]>(['1']);
+  const [movieIds] = useState<string[]>(['1']);
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
       movieIds,
     },
+  });
+  const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS, {
   });
   const [addTagToMovie] = useMutation(ADD_TAGS, {
     refetchQueries: ['GetMovies'],
@@ -110,33 +132,33 @@ function HomePage() {
     <div>
       <h1>Home Page</h1>
       {(() => {
-        if (loading) {
+        if (loading || loadingTags) {
           return <div>loading</div>
         }
         return <div style={{ display: 'flex', flexDirection: 'column', flex: 1}}>
           <ul>
-            {data.movies.map((movie: any) => {
-              const hasTag1 = movie.tags.find((t: any) => t.id === 'tag-1');
-              const hasTag2 = movie.tags.find((t: any) => t.id === 'tag-2');
-              const hasTag3 = movie.tags.find((t: any) => t.id === 'tag-3');
-              const hasTag4 = movie.tags.find((t: any) => t.id === 'tag-4');
-              const sortedTags = [...movie.tags].sort((tagA: any, tagB: any) => {
+            {data?.movies.map((movie: any) => {
+              const tags = movie.detailWrappers[0].details.tags;
+              const allowedTags = [...(tagsData?.tags ?? [])].sort((tagA: any, tagB: any) => {
+                return tagA.name.localeCompare(tagB.name);
+              });
+              const sortedMovieTags = [...tags].sort((tagA: any, tagB: any) => {
                 return tagA.name.localeCompare(tagB.name);
               });
               return <div key={movie.id} style={{ marginBottom: 10 }}>
                 <h4>{movie.internalTitle}</h4>
                 <div style={{ fontWeight: 'bold' }}>add more tags (remove a tag to add)</div>
 
-                <button disabled={hasTag3 || hasTag4} onClick={() => onClickAddTags(movie.id, ['tag-3', 'tag-4'])}>Add tag 3 and 4 at once</button>
-                <button disabled={hasTag1} onClick={() => onClickAddTags(movie.id, ['tag-1'])}>Add tag 1</button>
-                <button disabled={hasTag2} onClick={() => onClickAddTags(movie.id, ['tag-2'])}>Add tag 2</button>
-                <button disabled={hasTag3} onClick={() => onClickAddTags(movie.id, ['tag-3'])}>Add tag 3</button>
-                <button disabled={hasTag4} onClick={() => onClickAddTags(movie.id, ['tag-4'])}>Add tag 4</button>
+
+                {allowedTags.map(tag => {
+                  const hasTag = sortedMovieTags.find((t: any) => t.id === tag.id);
+                  return <button key={tag.id} disabled={hasTag} onClick={() => onClickAddTags(movie.id, [tag.id])}>Add {tag.name}</button>
+                })}
 
                 <div style={{ marginBottom: 50, width: '100%' }} />
                 <div style={{ fontWeight: 'bold' }}>movie tags</div>
                 <div>
-                  {sortedTags.map((tag: any) => {
+                  {sortedMovieTags.map((tag: any) => {
                     return <div key={tag.id}>
                       <div>{tag.name}</div>
                       <button onClick={() => onClickRemoveTags(movie.id, [tag.id])}>remove tag</button>
@@ -153,15 +175,19 @@ function HomePage() {
 }
 
 function App({ client }: { client: ApolloClient<any> }) {
+  const [homeMounted, setHomeMounted] = useState(true);
+  const onUnmountHomePage = useCallback(() => {
+    setHomeMounted(!homeMounted);
+  }, [homeMounted]);
   return <ApolloProvider client={client}>
-    <HomePage />
+    <button onClick={onUnmountHomePage}>unmount home</button>
+    {homeMounted && <HomePage />}
   </ApolloProvider>
 }
 
-const renderReactApp = async () => {
-  const client = await createClient();
+const renderReactApp = () => {
   ReactDOM.render(
-    <App client={client} />,
+    <App client={createClient()} />,
     document.getElementById("root")
   );  
 };
