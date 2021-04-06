@@ -1,31 +1,11 @@
 import React, { useCallback, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
+import { createClient, ApolloClient, ApolloProvider, InMemoryCache, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
+import { persistenceLink } from '@studio-ui-common/studio-graphql-client/links/persistence';
 
-import { createClient as studioCreateClient, useQuery, useMutation, InMemoryCacheConfig, ApolloProvider, ApolloClient } from '@studio-ui-common/studio-graphql-client';
-import { persistenceLink } from "@studio-ui-common/studio-graphql-client/links/persistence";
-
-
-const createClient = () => {
-  const cacheConfig: InMemoryCacheConfig = {
-    typePolicies: {
-      DetailsWrapper: {
-        keyFields: ['details', ['id']],
-      },
-      Details: {
-        fields: {
-          tags: {
-            merge: (existing, incoming, { mergeObjects }) => {
-              return incoming ?? existing;
-            }
-          }
-        }
-      },
-    }
-  };
-
-  return studioCreateClient({
-    cacheConfig,
+const createStudioGraphqlClient = () => {
+  return createClient({
     uri: '/graphql',
     defaultOptions: {
       watchQuery: {
@@ -43,6 +23,7 @@ const createClient = () => {
         // By default, mutation calls to `refetchQueries` do not trigger re-renders, e.g.
         // the loading state would be silent. We don't want that. We want loading states.
         notifyOnNetworkStatusChange: true,
+        // refetchWritePolicy: 'overwrite',
       },
     },
     namedLinks: {
@@ -57,42 +38,18 @@ query GetMovies($movieIds: [String!]!) {
   movies(movieIds: $movieIds) {
     id
     internalTitle
-    detailWrappers {
-      description
-      details {
-        id
-        tags {
-          id
-          name
-        }
-      }
+    tags {
+      id
+      name
     }
   }
 }
 `);
 
-const GET_TAGS = gql(`
-query GetTags($movieId: String) {
-  tags(movieId: $movieId) {
-    id
-    name
-  }
-}
-`);
-
-const ADD_TAGS = gql(`
-mutation AddTagToMovie($movieId: String!, $tagIds: [String!]!) {
-  addTagsToMovie(movieId: $movieId, tagIds: $tagIds) {
-    id
-  }
-}
-`);
 
 const REMOVE_TAGS = gql(`
 mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
-  removeTagsFromMovie(movieId: $movieId, tagIds: $tagIds) {
-    id
-  }
+  removeTagsFromMovie(movieId: $movieId, tagIds: $tagIds)
 }
 `);
 
@@ -103,22 +60,9 @@ function HomePage() {
       movieIds,
     },
   });
-  const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS, {
-  });
-  const [addTagToMovie] = useMutation(ADD_TAGS, {
-    refetchQueries: ['GetMovies'],
-  });
   const [removeTagFromMovie] = useMutation(REMOVE_TAGS, {
     refetchQueries: ['GetMovies'],
   });
-
-  const onClickAddTags = useCallback(async (movieId: string, tagIds: string[]) => {
-    try {
-      await addTagToMovie({ variables: { movieId, tagIds }});
-    } catch (err) {
-      console.warn(`failed to add tag to ${movieId}`);
-    }
-  }, [removeTagFromMovie]);
 
   const onClickRemoveTags = useCallback(async (movieId: string, tagIds: string[]) => {
     try {
@@ -132,28 +76,19 @@ function HomePage() {
     <div>
       <h1>Home Page</h1>
       {(() => {
-        if (loading || loadingTags) {
+        if (loading) {
           return <div>loading</div>
         }
         return <div style={{ display: 'flex', flexDirection: 'column', flex: 1}}>
           <ul>
             {data?.movies.map((movie: any) => {
-              const tags = movie.detailWrappers[0].details.tags;
-              const allowedTags = [...(tagsData?.tags ?? [])].sort((tagA: any, tagB: any) => {
-                return tagA.name.localeCompare(tagB.name);
-              });
+              const tags = movie.tags;
               const sortedMovieTags = [...tags].sort((tagA: any, tagB: any) => {
                 return tagA.name.localeCompare(tagB.name);
               });
               return <div key={movie.id} style={{ marginBottom: 10 }}>
                 <h4>{movie.internalTitle}</h4>
                 <div style={{ fontWeight: 'bold' }}>add more tags (remove a tag to add)</div>
-
-
-                {allowedTags.map(tag => {
-                  const hasTag = sortedMovieTags.find((t: any) => t.id === tag.id);
-                  return <button key={tag.id} disabled={hasTag} onClick={() => onClickAddTags(movie.id, [tag.id])}>Add {tag.name}</button>
-                })}
 
                 <div style={{ marginBottom: 50, width: '100%' }} />
                 <div style={{ fontWeight: 'bold' }}>movie tags</div>
@@ -187,7 +122,7 @@ function App({ client }: { client: ApolloClient<any> }) {
 
 const renderReactApp = () => {
   ReactDOM.render(
-    <App client={createClient()} />,
+    <App client={createStudioGraphqlClient()} />,
     document.getElementById("root")
   );  
 };
