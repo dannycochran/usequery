@@ -5,9 +5,11 @@ const { v4 } = require('uuid');
 const simpleSchema = gql`
     type Query {
         movies(movieIds: [String!]!): [Movie!]!
+        tags(movieId: String): [Tag!]!
     }
 
     type Mutation {
+        addTagsToMovie(movieId: String, tagIds: [String!]): Boolean
         removeTagsFromMovie(movieId: String, tagIds: [String!]): Boolean
     }
 
@@ -61,8 +63,27 @@ const server = new ApolloServer({
                     }, 100);
                 });
             },
+            tags: (root, args, context, info) => {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(Object.values(fakeTags));
+                    }, 100);
+                });
+            },
         },
         Mutation: {
+            addTagsToMovie: (root, args, context, info) => {
+                const movie = fakeMovies[args.movieId];
+                args.tagIds.forEach(tagId => {
+                    movie.tags.push(fakeTags[tagId]);
+                });
+                movie.tags = Array.from(new Set(movie.tags));
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(true);
+                    }, 100);
+                });
+            },
             removeTagsFromMovie: (root, args, context, info) => {
                 const movie = fakeMovies[args.movieId];
                 args.tagIds.forEach(tagId => {

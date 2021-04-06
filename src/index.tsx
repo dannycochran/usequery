@@ -46,6 +46,20 @@ query GetMovies($movieIds: [String!]!) {
 }
 `);
 
+const GET_TAGS = gql(`
+query GetTags($movieId: String) {
+  tags(movieId: $movieId) {
+    id
+    name
+  }
+}
+`);
+
+const ADD_TAGS = gql(`
+mutation AddTagToMovie($movieId: String!, $tagIds: [String!]!) {
+  addTagsToMovie(movieId: $movieId, tagIds: $tagIds)
+}
+`);
 
 const REMOVE_TAGS = gql(`
 mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
@@ -60,9 +74,22 @@ function HomePage() {
       movieIds,
     },
   });
+  const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS, {
+  });
+  const [addTagToMovie] = useMutation(ADD_TAGS, {
+    refetchQueries: ['GetMovies'],
+  });
   const [removeTagFromMovie] = useMutation(REMOVE_TAGS, {
     refetchQueries: ['GetMovies'],
   });
+
+  const onClickAddTags = useCallback(async (movieId: string, tagIds: string[]) => {
+    try {
+      await addTagToMovie({ variables: { movieId, tagIds }});
+    } catch (err) {
+      console.warn(`failed to add tag to ${movieId}`);
+    }
+  }, [removeTagFromMovie]);
 
   const onClickRemoveTags = useCallback(async (movieId: string, tagIds: string[]) => {
     try {
@@ -76,19 +103,28 @@ function HomePage() {
     <div>
       <h1>Home Page</h1>
       {(() => {
-        if (loading) {
+        if (loading || loadingTags) {
           return <div>loading</div>
         }
         return <div style={{ display: 'flex', flexDirection: 'column', flex: 1}}>
           <ul>
             {data?.movies.map((movie: any) => {
               const tags = movie.tags;
+              const allowedTags = [...(tagsData?.tags ?? [])].sort((tagA: any, tagB: any) => {
+                return tagA.name.localeCompare(tagB.name);
+              });
               const sortedMovieTags = [...tags].sort((tagA: any, tagB: any) => {
                 return tagA.name.localeCompare(tagB.name);
               });
               return <div key={movie.id} style={{ marginBottom: 10 }}>
                 <h4>{movie.internalTitle}</h4>
                 <div style={{ fontWeight: 'bold' }}>add more tags (remove a tag to add)</div>
+
+
+                {allowedTags.map(tag => {
+                  const hasTag = sortedMovieTags.find((t: any) => t.id === tag.id);
+                  return <button key={tag.id} disabled={hasTag} onClick={() => onClickAddTags(movie.id, [tag.id])}>Add {tag.name}</button>
+                })}
 
                 <div style={{ marginBottom: 50, width: '100%' }} />
                 <div style={{ fontWeight: 'bold' }}>movie tags</div>
@@ -108,6 +144,7 @@ function HomePage() {
     </div>
   );
 }
+
 
 function App({ client }: { client: ApolloClient<any> }) {
   const [homeMounted, setHomeMounted] = useState(true);
