@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
-import { createClient, ApolloProvider, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
+import { ApolloProvider, useMutation, useQuery, ApolloClient, InMemoryCache } from "@apollo/client";
 
-const createStudioGraphqlClient = () => {
-  return createClient({
+const createGraphQLClient = () => {
+  return new ApolloClient({
     uri: '/graphql',
-    namedLinks: {
-      corsLink: false,
-    }
+    cache: new InMemoryCache()
   });
 };
 
@@ -57,21 +55,7 @@ mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
 
 function HomePage() {
   const [movieId] = useState<string>('1');
-  const { data: unusedMinimalMovie } = useQuery(GET_MINIMAL_MOVIE, {
-    variables: {
-      movieId,
-    },
-  });
-
-  if (!unusedMinimalMovie) {
-    return null;
-  }
-  return <MoviePage movieId={movieId} />;
-}
-
-function MoviePage(props: { movieId: string }) {
   const hasCompletedOnce = useRef(false);
-  const { movieId } = props;
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
       movieId,
@@ -165,7 +149,7 @@ function MovieDetailsPage(props: { data: any, loading: boolean }) {
 
 const renderReactApp = () => {
   ReactDOM.render(
-    <ApolloProvider client={createStudioGraphqlClient()}>
+    <ApolloProvider client={createGraphQLClient()}>
       <HomePage />
     </ApolloProvider>,
     document.getElementById("root")
