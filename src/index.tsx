@@ -10,15 +10,6 @@ const createGraphQLClient = () => {
   });
 };
 
-const GET_MINIMAL_MOVIE = gql(`
-query GetMinimalMovie($movieId: String!) {
-  movie(movieId: $movieId) {
-    id
-    internalTitle
-  }
-}
-`);
-
 const GET_MOVIES = gql(`
 query GetMovie($movieId: String!) {
   movie(movieId: $movieId) {
@@ -56,20 +47,20 @@ mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
 function HomePage() {
   const [movieId] = useState<string>('1');
   const hasCompletedOnce = useRef(false);
+
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
       movieId,
     },
     fetchPolicy: hasCompletedOnce.current ? 'cache-first' : 'cache-and-network',
   });
+
   useEffect(() => {
     if (data && !loading) {
       hasCompletedOnce.current = true;
     }
   }, [data, loading]);
-  if (!data) {
-    return null;
-  }
+
   return <MovieDetailsPage data={data} loading={loading} />
 }
 
