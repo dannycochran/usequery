@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 import { ApolloProvider, useMutation, useQuery, ApolloClient, InMemoryCache } from "@apollo/client";
@@ -44,20 +44,25 @@ mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
 }
 `);
 
+/**
+ * Simulates our client wrapper behavior to preserve fetchPolicy state
+ * across mounts.
+ */
+let moviesQueryHasCompletedOnce = false;
+
 function HomePage() {
   const [movieId] = useState<string>('1');
-  const hasCompletedOnce = useRef(false);
 
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
       movieId,
     },
-    fetchPolicy: hasCompletedOnce.current ? 'cache-first' : 'cache-and-network',
+    fetchPolicy: moviesQueryHasCompletedOnce ? 'cache-first' : 'cache-and-network',
   });
 
   useEffect(() => {
     if (data && !loading) {
-      hasCompletedOnce.current = true;
+      moviesQueryHasCompletedOnce = true;
     }
   }, [data, loading]);
 
