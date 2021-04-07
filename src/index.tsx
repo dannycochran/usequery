@@ -66,11 +66,12 @@ function HomePage() {
 
 function MovieDetailsPage(props: { data: any, loading: boolean }) {
   const { data, loading } = props;
-  const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS, {
-  });
+  const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS);
+
   const [addTagToMovie] = useMutation(ADD_TAGS, {
     refetchQueries: ['GetMovie'],
   });
+
   const [removeTagFromMovie] = useMutation(REMOVE_TAGS, {
     refetchQueries: ['GetMovie'],
   });
@@ -90,17 +91,22 @@ function MovieDetailsPage(props: { data: any, loading: boolean }) {
       console.warn(`failed to remove tag from ${movieId}`);
     }
   }, [removeTagFromMovie]);
+
   if (!data?.movie) {
     return null;
   }
+
   const movie = data.movie;
   const tags = movie.tags;
+
   const allowedTags = [...(tagsData?.tags ?? [])].sort((tagA: any, tagB: any) => {
     return tagA.name.localeCompare(tagB.name);
   });
+
   const sortedMovieTags = [...tags].sort((tagA: any, tagB: any) => {
     return tagA.name.localeCompare(tagB.name);
   });
+
   return (
     <div>
       <h1>Home Page</h1>
