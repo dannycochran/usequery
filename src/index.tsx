@@ -186,13 +186,8 @@ function MovieDetailsPage(props: { movieId: string, data: any, loading: boolean 
 }
 
 function App({ client }: { client: ApolloClient<any> }) {
-  const [homeMounted, setHomeMounted] = useState(true);
-  const onUnmountHomePage = useCallback(() => {
-    setHomeMounted(!homeMounted);
-  }, [homeMounted]);
   return <ApolloProvider client={client}>
-    <button onClick={onUnmountHomePage}>unmount home</button>
-    {homeMounted && <HomePage />}
+    <HomePage />
   </ApolloProvider>
 }
 
