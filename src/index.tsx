@@ -2,14 +2,10 @@ import React, { useCallback, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 import { createClient, ApolloProvider, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
-import { persistenceLink } from '@studio-ui-common/studio-graphql-client/links/persistence';
-import { progressFetch } from '@studio-ui-common/studio-graphql-client/helpers/progress-fetch';
 
 const createStudioGraphqlClient = () => {
   return createClient({
     uri: '/graphql',
-    progressFetch,
-    connectToDevTools: true,
     defaultOptions: {
       watchQuery: {
         persistFetchPolicyState: true,
@@ -20,7 +16,6 @@ const createStudioGraphqlClient = () => {
     },
     namedLinks: {
       corsLink: false,
-      persistenceLink,
     }
   });
 };
