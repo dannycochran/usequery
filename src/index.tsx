@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
-import { createClient, ApolloClient, ApolloProvider, InMemoryCache, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
+import { createClient, ApolloProvider, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
 import { persistenceLink } from '@studio-ui-common/studio-graphql-client/links/persistence';
 import { progressFetch } from '@studio-ui-common/studio-graphql-client/helpers/progress-fetch';
 
@@ -86,7 +86,7 @@ mutation RemoveTagFromMovie($movieId: String!, $tagIds: [String!]!) {
 
 function HomePage() {
   const [movieId] = useState<string>('1');
-  const { data: unusedMinimalMovie, loading: loadingMinimalMovie } = useQuery(GET_MINIMAL_MOVIE, {
+  const { data: unusedMinimalMovie } = useQuery(GET_MINIMAL_MOVIE, {
     variables: {
       movieId,
     },
@@ -108,11 +108,11 @@ function MoviePage(props: { movieId: string }) {
   if (!data) {
     return null;
   }
-  return <MovieDetailsPage data={data} loading={loading} movieId={movieId }/>
+  return <MovieDetailsPage data={data} loading={loading} />
 }
 
-function MovieDetailsPage(props: { movieId: string, data: any, loading: boolean }) {
-  const { movieId, data, loading } = props;
+function MovieDetailsPage(props: { data: any, loading: boolean }) {
+  const { data, loading } = props;
   const { data: tagsData, loading: loadingTags } = useQuery(GET_TAGS, {
   });
   const [addTagToMovie] = useMutation(ADD_TAGS, {
