@@ -185,15 +185,11 @@ function MovieDetailsPage(props: { movieId: string, data: any, loading: boolean 
   );
 }
 
-function App({ client }: { client: ApolloClient<any> }) {
-  return <ApolloProvider client={client}>
-    <HomePage />
-  </ApolloProvider>
-}
-
 const renderReactApp = () => {
   ReactDOM.render(
-    <App client={createStudioGraphqlClient()} />,
+    <ApolloProvider client={createStudioGraphqlClient()}>
+      <HomePage />
+    </ApolloProvider>,
     document.getElementById("root")
   );  
 };
