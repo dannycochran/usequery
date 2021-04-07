@@ -4,7 +4,7 @@ const { v4 } = require('uuid');
 
 const simpleSchema = gql`
     type Query {
-        movies(movieIds: [String!]!): [Movie!]!
+        movie(movieId: String!): Movie!
         tags(movieId: String): [Tag!]!
     }
 
@@ -56,10 +56,10 @@ const server = new ApolloServer({
     typeDefs: simpleSchema.loc.source.body,
     resolvers: {
         Query: {
-            movies: (root, args, context, info) => {
+            movie: (root, args, context, info) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
-                        resolve(args.movieIds.map(movieId => fakeMovies[movieId]));
+                        resolve(fakeMovies[args.movieId]);
                     }, 100);
                 });
             },
