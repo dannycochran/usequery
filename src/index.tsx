@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 import { createClient, ApolloProvider, useMutation, useQuery } from "@studio-ui-common/studio-graphql-client";
@@ -6,14 +6,6 @@ import { createClient, ApolloProvider, useMutation, useQuery } from "@studio-ui-
 const createStudioGraphqlClient = () => {
   return createClient({
     uri: '/graphql',
-    defaultOptions: {
-      watchQuery: {
-        persistFetchPolicyState: true,
-        // Read from persisted cache at first when opening app, but kick off a network
-        // request to get updated data.
-        fetchPolicy: 'cache-and-network',
-      },
-    },
     namedLinks: {
       corsLink: false,
     }
@@ -78,12 +70,19 @@ function HomePage() {
 }
 
 function MoviePage(props: { movieId: string }) {
+  const hasCompletedOnce = useRef(false);
   const { movieId } = props;
   const { data, loading } = useQuery(GET_MOVIES, {
     variables: {
       movieId,
     },
+    fetchPolicy: hasCompletedOnce.current ? 'cache-first' : 'cache-and-network',
   });
+  useEffect(() => {
+    if (data && !loading) {
+      hasCompletedOnce.current = true;
+    }
+  }, [data, loading]);
   if (!data) {
     return null;
   }
