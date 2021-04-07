@@ -4,7 +4,6 @@
   "private": true,
   "dependencies": {
     "@apollo/client": "^3.3.13",
-    "@studio-ui-common/studio-graphql-client": "^1.1.17",
     "@testing-library/jest-dom": "^5.11.5",
     "@testing-library/react": "^11.1.2",
     "@testing-library/user-event": "^12.2.2",

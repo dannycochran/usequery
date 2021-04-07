@@ -6,7 +6,7 @@ import { ApolloProvider, useMutation, useQuery, ApolloClient, InMemoryCache } fr
 const createGraphQLClient = () => {
   return new ApolloClient({
     uri: '/graphql',
-    cache: new InMemoryCache()
+    cache: new InMemoryCache(),
   });
 };
 
