@@ -1,68 +1,54 @@
-
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
 const { v4 } = require('uuid');
 
 const simpleSchema = gql`
     type Query {
-        movies(movieIds: [Int!]): [Movie!]!
-        requestDetails: RequestDetails!
+        movie(movieId: String!): Movie!
+        tags(movieId: String): [Tag!]!
+    }
+
+    type Mutation {
+        addTagsToMovie(movieId: String, tagIds: [String!]): Boolean
+        removeTagsFromMovie(movieId: String, tagIds: [String!]): Boolean
+    }
+
+    type Tag {
+        id: String!
+        name: String!
     }
 
     type Movie {
-        movieId: Int!
-        internalTitle: String!
-    }
-
-    type RequestDetails {
         id: String!
+        internalTitle: String!
+        tags: [Tag!]!
     }
 `;
 
+const fakeTags = {
+    'tag-1': {
+        id: 'tag-1',
+        name: 'tag 1',
+    },
+    'tag-2': {
+        id: 'tag-2',
+        name: 'tag 2',
+    },
+    'tag-3': {
+        id: 'tag-3',
+        name: 'tag 3',
+    },
+    'tag-4': {
+        id: 'tag-4',
+        name: 'tag 4',
+    },
+};
+
 const fakeMovies = {
-    80117715: {
-        movieId: 80117715,
-        internalTitle: 'some movie 80117715',
-    },
-    80057281: {
-        movieId: 80057281,
-        internalTitle: 'some movie 80057281',
-    },
-    80117456: {
-        movieId: 80117456,
-        internalTitle: 'some movie 80117456',
-    },
-    80229867: {
-        movieId: 80229867,
-        internalTitle: 'some movie 80229867',
-    },
-    80025678: {
-        movieId: 80229867,
-        internalTitle: 'some movie 80229867',
-    },
-    80229865:{
-        movieId: 80229865,
-        internalTitle: 'some movie 80229865',
-    },
-    81023035:{
-        movieId: 81023035,
-        internalTitle: 'some movie 81023035',
-    },
-    80077209: {
-        movieId: 80077209,
-        internalTitle: 'some movie 80077209',
-    },
-    81023174: {
-        movieId: 81023174,
-        internalTitle: 'some movie 81023174',
-    },
-    81023181:{
-        movieId: 81023181,
-        internalTitle: 'some movie 81023181',
-    },
-    70000794:{
-        movieId: 70000794,
-        internalTitle: 'some movie 70000794',
+    '1': {
+        id: '1',
+        internalTitle: 'some movie 1',
+        tags: Object.values(fakeTags),
     },
 };
 
@@ -70,15 +56,49 @@ const server = new ApolloServer({
     typeDefs: simpleSchema.loc.source.body,
     resolvers: {
         Query: {
-            movies: (root, args, context, info) => {
-                const movieIds = args.movieIds;
+            movie: (root, args, context, info) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
-                        resolve(movieIds.map(movieId => fakeMovies[movieId]));
-                    }, 2000);
+                        resolve(fakeMovies[args.movieId]);
+                    }, 100);
+                });
+            },
+            tags: (root, args, context, info) => {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(Object.values(fakeTags));
+                    }, 100);
                 });
             },
         },
+        Mutation: {
+            addTagsToMovie: (root, args, context, info) => {
+                const movie = fakeMovies[args.movieId];
+                args.tagIds.forEach(tagId => {
+                    movie.tags.push(fakeTags[tagId]);
+                });
+                movie.tags = Array.from(new Set(movie.tags));
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(true);
+                    }, 100);
+                });
+            },
+            removeTagsFromMovie: (root, args, context, info) => {
+                const movie = fakeMovies[args.movieId];
+                args.tagIds.forEach(tagId => {
+                    const tagIndex = movie.tags.findIndex(tag => tag.id === tagId);
+                    if (tagIndex !== -1) {
+                        movie.tags.splice(tagIndex, 1);
+                    }
+                });
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(true);
+                    }, 100);
+                });
+            }
+        }
     }
 });
 const app = express();
