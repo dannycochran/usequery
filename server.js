@@ -1,7 +1,6 @@
 
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
-const { v4 } = require('uuid');
 
 const simpleSchema = gql`
     type Query {

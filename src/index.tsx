@@ -10,12 +10,6 @@ const client = new ApolloClient({
   link: new HttpLink({
     uri: "/graphql"
   }),
-  defaultOptions: {
-    watchQuery: {
-      fetchPolicy: 'cache-and-network',
-      nextFetchPolicy: 'cache-first',
-    }
-  }
 });
 
 // Removing "requestDetails" from here will make the React warnings go away.
@@ -80,7 +74,8 @@ closeWindowIfOpenedForAuth();
 /**
  * This causes bugs with React 16.14.0, but works fine in React 17.0.1
  */
-const NavigationPromptAsFn = () => {
+const RandomComponentThatUpdatesState = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_fruits, setFruits] = useState<any>();
   useEffect(() => {
     setFruits({ bananas: 1 });
@@ -90,24 +85,14 @@ const NavigationPromptAsFn = () => {
 };
 
 function HomePage() {
-  const { data, loading } = useQuery(GET_MOVIES, {
+  useQuery(GET_MOVIES, {
     variables: { movieIds: [80117456, 80025678] }
   });
   return (
     <div>
       <h1>Home Page Route</h1>
       <button onClick={() => openWindowForAuth()}>Sign in and out</button>
-      <NavigationPromptAsFn />
-      {loading && 'loading...'}
-      {(() => {
-        <ul>
-          {data?.movies.map((movie: any) => {
-            return <div key={movie.movieId}>
-              <div>{movie.internalTitle}</div>
-            </div>;
-          })}
-        </ul>
-      })()}
+      <RandomComponentThatUpdatesState />
     </div>
   );
 }
