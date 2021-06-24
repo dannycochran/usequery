@@ -75,7 +75,7 @@ const server = new ApolloServer({
                 return new Promise(resolve => {
                     setTimeout(() => {
                         resolve(movieIds.map(movieId => fakeMovies[movieId]));
-                    }, 2000);
+                    }, 200);
                 });
             },
         },
