@@ -12,7 +12,6 @@ const client = new ApolloClient({
   }),
 });
 
-// Removing "requestDetails" from here will make the React warnings go away.
 const GET_MOVIES = gql(`
 query GetMovies($movieIds: [Int!]!) {
   movies(movieIds: $movieIds) {
@@ -24,18 +23,9 @@ query GetMovies($movieIds: [Int!]!) {
 
 const AUTH_WINDOW_ID = 'oauth_auth_only_window';
 
-const timeoutError = () => new Error('TIMEOUT');
-
 const openWindowForAuth = () =>
   new Promise<void>((resolve, reject) => {
     try {
-      /**
-       * Set a local storage variable to identify that we are opening a new auth window.
-       * Using a local storage variable to identify the newly opened auth window is dangerous since
-       * it will also affect all other windows opened at the same time. If the user refreshes the
-       * current window, the app will see the local storage variable and close the window. Here we
-       * maintain an event listener to clear out the variable before the user refreshes the page.
-       */
       localStorage.setItem(AUTH_WINDOW_ID, 'true');
       const clearAuthWindowHook = () => {
         localStorage.removeItem(AUTH_WINDOW_ID);
@@ -43,10 +33,8 @@ const openWindowForAuth = () =>
       };
       window.addEventListener('beforeunload', clearAuthWindowHook);
 
-      // open the auth window
       const loginWindow = window.open(`/?${AUTH_WINDOW_ID}=${Date.now()}`);
 
-      // poll to determine if the auth window is closed
       let pollSeconds = 0;
       const poll = () => {
         if (loginWindow?.closed) {
@@ -54,7 +42,7 @@ const openWindowForAuth = () =>
           resolve();
         } else if (pollSeconds++ > 5 * 60) {
           clearAuthWindowHook();
-          reject(timeoutError());
+          reject(new Error('TIMEOUT'));
         } else setTimeout(poll, 1000);
       };
       poll();
