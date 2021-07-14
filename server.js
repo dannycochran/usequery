@@ -1,21 +1,15 @@
 
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
-const { v4 } = require('uuid');
 
 const simpleSchema = gql`
     type Query {
-        movies(movieIds: [Int!]): [Movie!]!
-        requestDetails: RequestDetails!
+        movie(movieId: ID!): Movie
     }
 
     type Movie {
         movieId: Int!
         internalTitle: String!
-    }
-
-    type RequestDetails {
-        id: String!
     }
 `;
 
@@ -37,8 +31,8 @@ const fakeMovies = {
         internalTitle: 'some movie 80229867',
     },
     80025678: {
-        movieId: 80229867,
-        internalTitle: 'some movie 80229867',
+        movieId: 80025678,
+        internalTitle: 'some movie 80025678',
     },
     80229865:{
         movieId: 80229865,
@@ -70,15 +64,16 @@ const server = new ApolloServer({
     typeDefs: simpleSchema.loc.source.body,
     resolvers: {
         Query: {
-            movies: (root, args, context, info) => {
-                const movieIds = args.movieIds;
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(movieIds.map(movieId => fakeMovies[movieId]));
-                    }, 2000);
+            movie: (root, args, context, info) => {
+                return new Promise((resolve, reject) => {
+                    if (fakeMovies[args.movieId]) {
+                        resolve(fakeMovies[args.movieId]);
+                        return;
+                    }
+                    reject('Unauthorized access');
                 });
             },
-        },
+        }
     }
 });
 const app = express();
