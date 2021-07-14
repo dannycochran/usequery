@@ -4,11 +4,7 @@ const express = require('express');
 
 const simpleSchema = gql`
     type Query {
-        movies: [Movie!]!
-    }
-
-    type Mutation {
-        deleteMovie(movieId: Int!): Boolean!
+        movie(movieId: ID!): Movie
     }
 
     type Movie {
@@ -68,23 +64,15 @@ const server = new ApolloServer({
     typeDefs: simpleSchema.loc.source.body,
     resolvers: {
         Query: {
-            movies: (root, args, context, info) => {
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(Object.values(fakeMovies));
-                    }, 2000);
+            movie: (root, args, context, info) => {
+                return new Promise((resolve, reject) => {
+                    if (fakeMovies[args.movieId]) {
+                        resolve(fakeMovies[args.movieId]);
+                        return;
+                    }
+                    reject('Unauthorized access');
                 });
             },
-        },
-        Mutation: {
-            deleteMovie: (root, args, context, info) => {
-                delete fakeMovies[args.movieId];
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(true);
-                    }, 100);
-                });
-            }
         }
     }
 });

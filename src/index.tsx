@@ -1,111 +1,97 @@
-import React from "react";
+import React, { useCallback } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
 import { BrowserRouter, Route, Switch, useHistory } from 'react-router-dom';
 
-import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery, useMutation} from "@apollo/client";
-import { useCallback } from "react";
-import { useEffect } from "react";
-import { useState } from "react";
-
+import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery} from "@apollo/client";
 const client = new ApolloClient({
   cache: new InMemoryCache(),
   link: new HttpLink({
     uri: "/graphql"
   }),
+  defaultOptions: {
+    watchQuery: {
+      // Read from persisted cache at first when opening app, but kick off a network
+      // request to get updated data.
+      fetchPolicy: 'cache-and-network',
+      nextFetchPolicy(lastFetchPolicy) {
+        if (lastFetchPolicy === 'cache-and-network' || lastFetchPolicy === 'network-only') {
+          return 'cache-first';
+        }
+        return lastFetchPolicy;
+      },
+
+      // By default, mutation calls to `refetchQueries` do not trigger re-renders, e.g.
+      // the loading state would be silent. We don't want that. We want loading states.
+      notifyOnNetworkStatusChange: true,
+    },
+  },
 });
 
-const GET_MOVIES = gql(`
-query GetMovies {
-  movies {
+const GET_MOVIE = gql(`
+query GetMovie($movieId: ID!) {
+  movie(movieId: $movieId) {
     movieId
     internalTitle
   }
 }
 `);
 
-const DELETE_MOVIE = gql(`
-mutation DeleteMovie($movieId: Int!) {
-  deleteMovie(movieId: $movieId)
-}
-`);
-
-function AnotherPageWithMovies() {
-  const { data } = useQuery(GET_MOVIES, {
-    fetchPolicy: 'cache-only',
-    nextFetchPolicy: 'cache-only'
+function AnotherPageWithCorrectAuthorization() {
+  const { data, error } = useQuery(GET_MOVIE, {
+    variables: {
+      movieId: 70000794
+    }
   });
 
-  /**
-   * Force re-rendering so we continue to read from cache after the refetchQueries completes, to demonstrate
-   * that the cache is not updated.
-   */
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setTick((prevTick) => prevTick + 1);
-    }, 1000);
-    return () => {
-      window.clearInterval(interval);
-    }
-  }, []);
+  console.log('AnotherPageWithCorrectAuthorization', data, error);
   return <div>
-    <h1>We switched routes and the movies list did not update, tick {tick}</h1>
+    <h1>We switched routes and we have a valid movie, but we have the existing error from the first invocation of the query with a different variable set</h1>
+    {error && <div>{error.message}</div>}
     {(() => {
-        if (!data) {
-          return <div>loading...</div>
-        }
-        return <ul>
-          {data.movies.map((movie: any, index: number) => {
-            return <div key={movie.movieId} style={{ display: 'flex', flexDirection: 'row'}}>
-              <div>Movie #: {index}</div>
-              <div>{movie.internalTitle}</div>
-            </div>;
-          })}
-        </ul>
-      })()}
+      if (!data) {
+        return <div>we have no movie...</div>
+      }
+      return <div key={data.movie.movieId} style={{ display: 'flex', flexDirection: 'row'}}>
+        <div>{data.movie.internalTitle}</div>
+      </div>
+    })()}
   </div>
 }
 
-function HomePageWithMovies() {
-  const { data, loading } = useQuery(GET_MOVIES);
-  const [deleteMovie] = useMutation(DELETE_MOVIE, {
-    refetchQueries: ['GetMovies']
+function DefaultPageWithUnauthorizedAccess() {
+  const { data, error } = useQuery(GET_MOVIE, {
+    variables: {
+      // this movie id is invalid, so we expect an error
+      movieId: 13412412412414124
+    }
   });
+
   const history = useHistory();
-  const onDeleteMovie = useCallback(async (movieId: number) => {
-    await deleteMovie({ variables: { movieId }});
+  const onNavigateToValidRoute = useCallback(()=> {
     history.push('/foobar');
-  }, [deleteMovie, history])
+  }, [history])
 
-  return (
-    <div>
-      <h1>Home Page Route</h1>
-      <div>when you delete a movie, we will change routes right after the mutation finishes, but before refetch queries does. the mounted page will have the same list of movies because the cache did not update properly</div>
-      {(() => {
-        if (loading) {
-          return <div>loading...</div>
-        }
-        return <ul>
-          {data.movies.map((movie: any, index: number) => {
-            return <div key={movie.movieId} style={{ display: 'flex', flexDirection: 'row'}}>
-              <div>Movie #: {index}</div>
-              <button onClick={() => onDeleteMovie(movie.movieId)}>delete movie</button>
-              <div>{movie.internalTitle}</div>
-            </div>;
-          })}
-        </ul>
-      })()}
-    </div>
-  );
+  return <div>
+    <h1>We expect an error here because the movie id is invalid...</h1>
+    <button onClick={onNavigateToValidRoute}>Click me to goto the other route and the error will show up there as well</button>
+    {error && <div>{error.message}</div>}
+    {(() => {
+      if (!data) {
+        return <div>we have no movie...</div>
+      }
+      return <div key={data.movie.movieId} style={{ display: 'flex', flexDirection: 'row'}}>
+        <div>{data.movie.internalTitle}</div>
+      </div>
+    })()}
+  </div>
 }
-
 function App() {
   return <ApolloProvider client={client}>
     <BrowserRouter>
       <Switch>
-        <Route exact path={'/'} component={HomePageWithMovies} />
-        <Route exact path={'/foobar'} component={AnotherPageWithMovies} />
+        <Route exact path={'/'} component={DefaultPageWithUnauthorizedAccess} />
+        <Route exact path={'/foobar'} component={AnotherPageWithCorrectAuthorization} />
       </Switch>
     </BrowserRouter>
   </ApolloProvider>
