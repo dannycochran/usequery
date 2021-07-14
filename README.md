@@ -5,8 +5,9 @@ npm install
 npm run start
 ```
 
-1. Delete any movie
-2. Observe that the mutation succeeds
-3. Observe that the refetch queries succeeds to the server
-4. observe that in the new route, we are reading from cache and forcing continuous updates but we are reading stale cache results each time.
-5. observe that refreshing back to the home route shows the movie is gone.
+1. Navigate to localhost:3000/124891248912491
+2. Notice that you will see an error from "useQuery", this is expected.
+3. Click the button to return home where there is no movie query parameter.
+4. Click the button to navigate to valid movie.
+5. Note a flicker where the error message will temporarily render, and note in the console that the error is still present from the "useQuery" return value.
+6. The error then disappears once the fetch is complete. However, since the variable set is distinct at the point of #4, the "useQuery" state should be empty and there should be no cached value for this query yet.
