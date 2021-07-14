@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import ReactDOM from "react-dom";
 import gql from "graphql-tag";
-import { BrowserRouter, Route, Switch, useHistory } from 'react-router-dom';
+import { BrowserRouter, Route, Switch, useHistory, useParams } from 'react-router-dom';
 
 import { ApolloClient, HttpLink, InMemoryCache, ApolloProvider, useQuery} from "@apollo/client";
 const client = new ApolloClient({
@@ -37,44 +37,35 @@ query GetMovie($movieId: ID!) {
 }
 `);
 
-function AnotherPageWithCorrectAuthorization() {
+function HomePage() {
+  const { movieId } = useParams() as { movieId?: string };
   const { data, error } = useQuery(GET_MOVIE, {
     variables: {
-      movieId: 70000794
-    }
+      movieId
+    },
+    skip: !movieId,
   });
 
-  console.log('AnotherPageWithCorrectAuthorization', data, error);
-  return <div>
-    <h1>We switched routes and we have a valid movie, but we have the existing error from the first invocation of the query with a different variable set</h1>
-    {error && <div>{error.message}</div>}
-    {(() => {
-      if (!data) {
-        return <div>we have no movie...</div>
-      }
-      return <div key={data.movie.movieId} style={{ display: 'flex', flexDirection: 'row'}}>
-        <div>{data.movie.internalTitle}</div>
-      </div>
-    })()}
-  </div>
-}
-
-function DefaultPageWithUnauthorizedAccess() {
-  const { data, error } = useQuery(GET_MOVIE, {
-    variables: {
-      // this movie id is invalid, so we expect an error
-      movieId: 13412412412414124
-    }
-  });
-
+  console.log('home page rendering', movieId, error);
   const history = useHistory();
   const onNavigateToValidRoute = useCallback(()=> {
-    history.push('/foobar');
-  }, [history])
+    history.push('/80057281');
+  }, [history]);
+
+  const onNavigateHome = useCallback(()=> {
+    history.push('/');
+  }, [history]);
+
+  if (!movieId) {
+    return <div>
+    <h1>Home Page -- No Movie ID in URL</h1>
+    <button onClick={onNavigateToValidRoute}>Click me to navigate to a valid movie id where the error will persist.</button>
+  </div>
+  }
 
   return <div>
-    <h1>We expect an error here because the movie id is invalid...</h1>
-    <button onClick={onNavigateToValidRoute}>Click me to goto the other route and the error will show up there as well</button>
+    <h1>Movie Detail Page</h1>
+    <button onClick={onNavigateHome}>Click me to navigate home</button>
     {error && <div>{error.message}</div>}
     {(() => {
       if (!data) {
@@ -90,8 +81,7 @@ function App() {
   return <ApolloProvider client={client}>
     <BrowserRouter>
       <Switch>
-        <Route exact path={'/'} component={DefaultPageWithUnauthorizedAccess} />
-        <Route exact path={'/foobar'} component={AnotherPageWithCorrectAuthorization} />
+        <Route exact path={'/:movieId?'} component={HomePage} />
       </Switch>
     </BrowserRouter>
   </ApolloProvider>
