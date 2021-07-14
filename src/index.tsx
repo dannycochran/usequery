@@ -9,23 +9,6 @@ const client = new ApolloClient({
   link: new HttpLink({
     uri: "/graphql"
   }),
-  defaultOptions: {
-    watchQuery: {
-      // Read from persisted cache at first when opening app, but kick off a network
-      // request to get updated data.
-      fetchPolicy: 'cache-and-network',
-      nextFetchPolicy(lastFetchPolicy) {
-        if (lastFetchPolicy === 'cache-and-network' || lastFetchPolicy === 'network-only') {
-          return 'cache-first';
-        }
-        return lastFetchPolicy;
-      },
-
-      // By default, mutation calls to `refetchQueries` do not trigger re-renders, e.g.
-      // the loading state would be silent. We don't want that. We want loading states.
-      notifyOnNetworkStatusChange: true,
-    },
-  },
 });
 
 const GET_MOVIE = gql(`
